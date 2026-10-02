@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "updated": "2026-10-02",
   "buildings": [
     {
@@ -7,6 +7,7 @@
       "name": "Cast Iron Lofts",
       "source": "NEW Hoboken Shuttle schedule (PDF)",
       "rideMinutes": 10,
+      "loopMinutes": 10,
       "vehicles": {
         "bus1": {
           "label": "Bus 1"
@@ -111,6 +112,7 @@
       "name": "Soho Lofts",
       "source": "Soho Lofts printed schedules (morning + evening)",
       "rideMinutes": 10,
+      "loopMinutes": 10,
       "vehicles": {
         "bus1": {
           "label": "Bus 1"

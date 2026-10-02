@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hoboken Shuttle tests</title>
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; max-width: 720px; margin: 24px auto; padding: 0 16px; }
+    li { list-style: none; padding: 2px 0; } .pass::before { content: "✓ "; color: #15803D; }
+    .fail { color: #B91C1C; font-weight: 600; } .fail::before { content: "✗ "; }
+    #summary { font-weight: 700; font-size: 18px; }
+  </style>
+</head>
+<body>
+  <h1>Logic tests</h1>
+  <p>Serve the repo (<code>python3 -m http.server</code>) and open <code>/tests.html</code>.</p>
+  <p id="summary">Running…</p>
+  <ul id="results"></ul>
+  <script type="module">
+    import { nowNY, parseNowOverride, addDays, daysBetween, dayKey, fmtText } from './js/time.js';
+    import * as L from './js/logic.js';
+
+    const [sch, path] = await Promise.all(['data/schedules.json', 'data/path.json'].map((u) => fetch(u).then((r) => r.json())));
+    const bld = (id) => sch.buildings.find((b) => b.id === id);
+    const [cast, soho] = [bld('cast-iron'), bld('soho-lofts')];
+    const at = (date, hhmm) => ({ date, minutes: +hhmm.slice(0, 2) * 60 + +hhmm.slice(3) });
+    // 2026-10-02 is a Friday: Sat 10-03, Sun 10-04, Mon 10-05, Tue 10-06
+    const results = [];
+    const eq = (name, got, want) => results.push({ name, ok: JSON.stringify(got) === JSON.stringify(want), got, want });
+    const ok = (name, cond, got) => results.push({ name, ok: !!cond, got, want: 'truthy' });
+
+    // time
+    eq('weekday keys', ['2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05'].map(dayKey), ['fri', 'sat', 'sun', 'mon']);
+    eq('addDays crosses month', addDays('2026-10-31', 1), '2026-11-01');
+    eq('daysBetween', daysBetween('2026-10-02', '2026-10-05'), 3);
+    eq('?now parse', parseNowOverride('2026-10-05T07:41'), { date: '2026-10-05', minutes: 461 });
+    eq('?now rejects junk', [parseNowOverride('2026-13-45T07:41'), parseNowOverride('nope'), parseNowOverride('2026-10-05T25:00')], [null, null, null]);
+    eq('fmtText midnight / noon / after 24h', [fmtText(0), fmtText(720), fmtText(1445)], ['12:00 AM', '12:00 PM', '12:05 AM']);
+
+    // vehicles are building-scoped
+    eq('null vehicle -> no chip', L.vehicleOf(cast, null), null);
+    const savedLabel = soho.vehicles.bus1.label;
+    soho.vehicles.bus1.label = 'SOHO-ONLY';
+    eq('bus1 resolves via its own building', [L.vehicleOf(cast, 'bus1').label, L.vehicleOf(soho, 'bus1').label], ['Bus 1', 'SOHO-ONLY']);
+    soho.vehicles.bus1.label = savedLabel;
+
+    // shuttle day matching uses each service's days exactly
+    const castThu = L.departuresFor(cast, 'from_path', '2026-10-01'), castMon = L.departuresFor(cast, 'from_path', '2026-10-05');
+    ok('Cast Iron Thu has late runs Mon lacks', castThu.length > castMon.length && castThu.some((d) => d.time === '23:00' && d.vehicle === null), castThu.length + ' vs ' + castMon.length);
+    ok('departures sorted', castThu.every((d, i) => !i || castThu[i - 1].min <= d.min));
+    const sohoMon = L.departuresFor(soho, 'from_path', '2026-10-05'), sohoFri = L.departuresFor(soho, 'from_path', '2026-10-02');
+    ok('Soho Mon–Wed vs Thu–Fri evenings differ', sohoMon.at(-1).time === '20:50' && sohoFri.at(-1).time === '22:50', [sohoMon.at(-1).time, sohoFri.at(-1).time]);
+
+    // next departure
+    let n = L.nextDeparture(cast, 'to_path', at('2026-10-05', '07:41'));
+    ok('Mon 07:41 next to_path is today, >= now', n.date === '2026-10-05' && n.dep.min >= 461, n.dep.time);
+    n = L.nextDeparture(cast, 'to_path', at('2026-10-03', '09:00'));
+    eq('Sat 09:00: no posted to_path, but the estimated evening loop gives ≈17:40 Van today', [n.date, n.dep.time, n.dep.estimated, n.dep.vehicle.id], ['2026-10-03', '17:40', true, 'van']);
+    n = L.nextDeparture(cast, 'to_path', at('2026-10-04', '09:00'));
+    eq('Sun (no service at all) -> Monday first posted departure', [n.date, n.dep.time, n.dep.estimated], ['2026-10-05', cast.services[0].departures[0].time, false]);
+    n = L.nextDeparture(soho, 'from_path', at('2026-10-05', '21:30'));
+    eq('Mon 21:30 Soho after last posted run -> Tue first from_path is the estimated morning return ≈06:10', [n.date, n.dep.time, n.dep.estimated], ['2026-10-06', '06:10', true]);
+    n = L.nextDeparture(cast, 'from_path', at('2026-10-02', '23:30'));
+    eq('Fri 23:30 Cast Iron home -> Sat 17:30', [n.date, n.dep.time], ['2026-10-03', '17:30']);
+
+    // PATH day types and midnight crossing
+    eq('day types', ['2026-10-02', '2026-10-03', '2026-10-04'].map((d) => L.pathDayType(path, d)), ['weekday', 'saturday', 'sunday']);
+    eq('holiday uses sunday', L.pathDayType({ ...path, holidays: ['2026-10-05'] }, '2026-10-05'), 'sunday');
+    const tl = L.pathTimeline(path, '2026-10-02', 'departures');
+    ok('timeline continues past midnight and stays sorted', tl.some((e) => e.abs >= 1440) && tl.every((e, i) => !i || tl[i - 1].abs <= e.abs));
+    const late = L.pathArrivalsWindow(path, at('2026-10-02', '23:30'));
+    ok('arrivals window crosses midnight', late.some((e) => e.abs >= 1440) && late.every((e) => e.abs <= 23 * 60 + 30 + 90), late.length);
+
+    // connections: buffer, slack, tight
+    const c = L.connections(path, '2026-10-05', 7 * 60 + 51);
+    ok('first 33rd St train respects the platform buffer', c[0].first.abs >= 7 * 60 + 51 + L.PLATFORM_BUFFER_MIN && c[0].slack >= 0 && c[0].first.abs - 471 - 2 === c[0].slack, c[0]);
+    ok('then-train follows first', c[0].then.abs > c[0].first.abs);
+    ok('WTC card normal in the morning', c[1].dest === L.WTC && c[1].first, c[1]);
+
+    // after lastDirectWTC (fixture: to_path shuttle that arrives after 23:13 on a weekday)
+    const lateBuilding = { id: 'x', rideMinutes: 10, vehicles: { v: { label: 'V' } }, notices: [], services: [{ direction: 'to_path', from: 'X', days: ['fri'], departures: [{ time: '23:10', vehicle: 'v' }] }] };
+    const ln = L.nextDeparture(lateBuilding, 'to_path', at('2026-10-02', '23:00'));
+    const lc = L.shuttleConnections(path, lateBuilding, ln);
+    eq('WTC replaced after lastDirectWTC', [lc[1].noDirectAfter, !!lc[0].first], [path.lastDirectWTC.weekday, true]);
+    eq('Saturday uses saturday lastDirectWTC', L.connections(path, '2026-10-03', 21 * 60 + 30)[1].noDirectAfter, path.lastDirectWTC.saturday);
+
+    // home shuttle
+    let h = L.homeShuttle(cast, at('2026-10-09', '18:12'), null);
+    ok('now: shuttle at/after now', h.dep.min >= 18 * 60 + 12 && h.waitMin === h.dep.min - (18 * 60 + 12) && h.miss.dep.min > h.dep.min, h.dep.time);
+    const arr = 18 * 60 + 24;
+    h = L.homeShuttle(cast, at('2026-10-09', '18:12'), arr);
+    ok('train picked: walk buffer applied, wait measured from arrival', h.dep.min >= arr + L.HOME_WALK_MIN && h.waitMin === h.dep.min - arr, [h.dep.time, h.waitMin]);
+    h = L.homeShuttle(cast, at('2026-10-02', '23:30'), null);
+    eq('after last shuttle -> next service day', [h.date, h.dep.time], ['2026-10-03', '17:30']);
+    ok('last shuttle lookup is posted-only by default', L.lastShuttle(cast, 'from_path', '2026-10-02').time === '23:00' && L.lastShuttle(cast, 'to_path', '2026-10-03') === null);
+
+    // full-schedule tabs derive from data
+    eq('Cast Iron tabs', L.scheduleGroups(cast).map((g) => g.label), ['Mon–Wed', 'Thu–Fri', 'Sat']);
+    eq('Soho tabs (Sunday has a notice only)', L.scheduleGroups(soho).map((g) => g.label), ['Mon–Wed', 'Thu–Fri', 'Sat', 'Sun']);
+    ok('notices for Soho Sunday only', L.noticesFor(soho, '2026-10-04').length === 1 && L.noticesFor(soho, '2026-10-05').length === 0);
+
+    // timezone independence: fixed UTC instants must map to the same New York wall time on any device
+    const ny = (iso) => { const n = nowNY(new Date(iso)); return `${n.date} ${dayKey(n.date)} ${fmtText(n.minutes)}`; };
+    eq('2026-10-05T11:41Z = Mon 7:41 AM (EDT)', ny('2026-10-05T11:41:00Z'), '2026-10-05 mon 7:41 AM');
+    eq('2026-12-25T05:00Z = Fri 12:00 AM (EST, midnight shows as 0 not 24)', ny('2026-12-25T05:00:00Z'), '2026-12-25 fri 12:00 AM');
+    eq('NY midnight boundary: 03:59Z is still Sunday, 04:00Z is Monday', [ny('2026-10-05T03:59:00Z'), ny('2026-10-05T04:00:00Z')], ['2026-10-04 sun 11:59 PM', '2026-10-05 mon 12:00 AM']);
+    eq('DST ends 2026-11-01: 05:30Z = 1:30 AM EDT, 06:30Z = 1:30 AM EST (same date)', [ny('2026-11-01T05:30:00Z'), ny('2026-11-01T06:30:00Z')], ['2026-11-01 sun 1:30 AM', '2026-11-01 sun 1:30 AM']);
+    eq('DST ends: 07:00Z = 2:00 AM EST', ny('2026-11-01T07:00:00Z'), '2026-11-01 sun 2:00 AM');
+    eq('DST starts 2027-03-14: 06:59Z = 1:59 AM EST, 07:00Z = 3:00 AM EDT', [ny('2027-03-14T06:59:00Z'), ny('2027-03-14T07:00:00Z')], ['2027-03-14 sun 1:59 AM', '2027-03-14 sun 3:00 AM']);
+    eq('date math is DST-safe', [daysBetween('2026-10-31', '2026-11-02'), addDays('2026-11-01', 1), dayKey('2026-11-02')], [2, '2026-11-02', 'mon']);
+
+    // merged arrival options
+    const opts = L.arrivalOptions(path, at('2026-10-09', '18:12'));
+    ok('one option per minute (no duplicates)', new Set(opts.map((o) => o.abs)).size === opts.length && opts.length > 0, opts.length);
+    const six15 = opts.find((o) => o.abs === 18 * 60 + 15);
+    eq('same-minute arrivals merge, 33rd St first', six15 && six15.origins, ['33rd St', 'World Trade Center']);
+    ok('single-origin minutes stay single', opts.some((o) => o.origins.length === 1));
+    ok('options are sorted and inside the 90-minute window', opts.every((o, i) => (!i || opts[i - 1].abs < o.abs) && o.abs >= 18 * 60 + 12 && o.abs <= 18 * 60 + 12 + L.ARRIVAL_WINDOW_MIN));
+    const nightOpts = L.arrivalOptions(path, at('2026-10-02', '23:30'));
+    ok('options cross midnight into the next day', nightOpts.some((o) => o.date === '2026-10-03'), nightOpts.length);
+
+    // ---- estimated return trips ----
+    const times = (list) => list.map((d) => d.time);
+    const estOnly = (b, dir, date) => L.departuresFor(b, dir, date).filter((d) => d.estimated);
+    const all = [['cast-iron', cast], ['soho-lofts', soho]].flatMap(([, b]) => ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-05'].flatMap((d) => ['to_path', 'from_path'].flatMap((dir) => L.departuresFor(b, dir, d))));
+    ok('every departure carries a boolean "estimated"', all.length > 100 && all.every((d) => typeof d.estimated === 'boolean'), all.length);
+
+    // Soho Mon 16:10 To PATH
+    n = L.nextDeparture(soho, 'to_path', at('2026-10-05', '16:10'));
+    eq('Soho Mon 16:10: next to PATH is ≈16:20 Bus 2 (from the 16:10 PATH departure)', [n.dep.time, n.dep.estimated, n.dep.vehicle.label, n.dep.returningFrom], ['16:20', true, 'Bus 2', 'PATH']);
+    let last = L.lastShuttle(soho, 'to_path', '2026-10-05', true);
+    eq('Soho Mon last to PATH ≈20:40 Van (20:30 + 10); the 20:50 run does not return', [last.time, last.estimated, last.vehicle.label, estOnly(soho, 'to_path', '2026-10-05').some((d) => d.time === '21:00')], ['20:40', true, 'Van', false]);
+    eq('Soho Mon–Wed share the same last (Wed too)', L.lastShuttle(soho, 'to_path', '2026-10-07', true).time, '20:40');
+    eq('Soho Thu: last posted 22:50 has no return, last estimate 22:40', L.lastShuttle(soho, 'to_path', '2026-10-08', true).time, '22:40');
+
+    // Cast Iron Mon 16:10
+    n = L.nextDeparture(cast, 'to_path', at('2026-10-05', '16:10'));
+    eq('Cast Iron Mon 16:10: ≈16:10 Bus 1, then ≈16:25 Van', [n.dep.time, n.dep.vehicle.label, n.dep.estimated, n.list[n.index + 1].time, n.list[n.index + 1].vehicle.label], ['16:10', 'Bus 1', true, '16:25', 'Van']);
+    last = L.lastShuttle(cast, 'to_path', '2026-10-05', true);
+    eq('Cast Iron Mon last to PATH ≈20:25 (20:15 + 10); 21:00 excluded', [last.time, estOnly(cast, 'to_path', '2026-10-05').some((d) => d.time === '21:10')], ['20:25', false]);
+
+    // Cast Iron Fri / Sat
+    last = L.lastShuttle(cast, 'to_path', '2026-10-09', true);
+    eq('Cast Iron Fri last estimated to PATH ≈22:40; the 23:00 run has no return', [last.time, last.estimated, estOnly(cast, 'to_path', '2026-10-09').some((d) => d.time === '23:10')], ['22:40', true, false]);
+    last = L.lastShuttle(cast, 'to_path', '2026-10-03', true);
+    eq('Cast Iron Sat last estimated to PATH ≈22:40', [last.time, last.estimated], ['22:40', true]);
+
+    // Home, morning estimated returns
+    const morning = estOnly(cast, 'from_path', '2026-10-05');
+    ok('Cast Iron Mon has estimated from_path returns, including the last morning run', morning.length === cast.services[0].departures.length && morning.at(-1).time === '10:10', morning.length);
+    ok('≈09:10 from the 09:00 Bus 2', morning.some((d) => d.time === '09:10' && d.vehicle.label === 'Bus 2' && d.returningFrom === 'Cast Iron Lofts'));
+    h = L.homeShuttle(cast, at('2026-10-05', '09:05'), null);
+    eq('Mon 09:05 Home: next is ≈09:10 Bus 2 (estimated)', [h.dep.time, h.dep.estimated, h.dep.vehicle.label], ['09:10', true, 'Bus 2']);
+
+    // null vehicles
+    const nulls = estOnly(cast, 'to_path', '2026-10-01').filter((d) => d.vehicle === null);
+    eq('Cast Iron Thu late runs give null-vehicle estimates (21:30/22:00/22:30 -> 21:40/22:10/22:40, none for 23:00)', times(nulls), ['21:40', '22:10', '22:40']);
+
+    // rules against fixtures
+    const fx = (over) => ({ id: 'f', name: 'Fix', rideMinutes: 10, loopMinutes: 10, vehicles: { a: { label: 'A' }, b: { label: 'B' } }, notices: [],
+      services: [{ direction: 'from_path', from: 'P', days: ['mon'], departures: [{ time: '12:00', vehicle: 'a' }, { time: '13:00', vehicle: 'a' }] }, ...(over || [])] });
+    eq('estimated trip at the same time/direction as a posted one: keep the posted one only',
+      L.departuresFor(fx([{ direction: 'to_path', from: 'Fix', days: ['mon'], departures: [{ time: '12:10', vehicle: 'b' }] }]), 'to_path', '2026-10-05').filter((d) => d.time === '12:10').map((d) => [d.vehicle.id, d.estimated]), [['b', false]]);
+    eq('loopMinutes (not rideMinutes) sets the estimate offset', [L.departuresFor({ ...fx(), loopMinutes: 15, rideMinutes: 10 }, 'to_path', '2026-10-05').filter((d) => d.estimated).map((d) => d.time),
+      L.departuresFor({ ...fx(), loopMinutes: 10, rideMinutes: 25 }, 'to_path', '2026-10-05').filter((d) => d.estimated).map((d) => d.time)], [['12:15'], ['12:10']]);
+    eq('last from_path is computed per date after merging services', times(L.departuresFor(fx([{ direction: 'from_path', from: 'P', days: ['mon'], departures: [{ time: '14:00', vehicle: 'b' }] }]), 'to_path', '2026-10-05')), ['12:10', '13:10']);
+    eq('null stays null; same date', L.departuresFor(fx([{ direction: 'from_path', from: 'P', days: ['mon'], departures: [{ time: '11:00', vehicle: null }] }]), 'to_path', '2026-10-05').filter((d) => d.time === '11:10').map((d) => d.vehicle), [null]);
+    ok('estimates never pass 23:59', all.every((d) => d.min < 1440));
+
+    // ---- hero gap framing ----
+    const frameFor = (b, dir, now) => {
+      const nd = dir === 'to_path' ? L.nextDeparture(b, 'to_path', now) : L.homeShuttle(b, now, null);
+      const away = dir === 'to_path' ? nd.dep.min - now.minutes : nd.waitMin;
+      return L.heroFrame({ direction: dir, dep: nd.dep, date: nd.date, now, minutesAway: away, noServiceToday: !L.departuresFor(b, dir, now.date).length });
+    };
+    eq('threshold constant', L.GAP_THRESHOLD_MIN, 60);
+    eq('Soho Mon 21:30 Home: later day -> "No more shuttles from PATH tonight", Next: Tomorrow ≈ 6:10 AM',
+      frameFor(soho, 'from_path', at('2026-10-05', '21:30')), { gap: 'later-day', headline: 'No more shuttles from PATH tonight', next: 'Next:', when: 'Tomorrow', time: '≈ 6:10 AM' });
+    eq('Cast Iron Sat 09:00 To PATH: same-day gap -> "No shuttle to PATH until ≈ 5:40 PM"',
+      frameFor(cast, 'to_path', at('2026-10-03', '09:00')), { gap: 'same-day', headline: 'No shuttle to PATH until', time: '≈ 5:40 PM' });
+    eq('Soho Sun 14:00 Home: no service today -> "No shuttle from PATH on Sunday", Next: Tomorrow ≈ 6:10 AM',
+      frameFor(soho, 'from_path', at('2026-10-04', '14:00')), { gap: 'later-day', headline: 'No shuttle from PATH on Sunday', next: 'Next:', when: 'Tomorrow', time: '≈ 6:10 AM' });
+    eq('Cast Iron Fri 23:30 To PATH: "No more shuttles to PATH today", Next: Tomorrow ≈ 5:40 PM',
+      frameFor(cast, 'to_path', at('2026-10-09', '23:30')), { gap: 'later-day', headline: 'No more shuttles to PATH today', next: 'Next:', when: 'Tomorrow', time: '≈ 5:40 PM' });
+    eq('posted next departure carries no ≈ (Cast Iron Sun To PATH: no service today, Monday 6:00 AM is tomorrow)',
+      frameFor(cast, 'to_path', at('2026-10-04', '09:00')), { gap: 'later-day', headline: 'No shuttle to PATH on Sunday', next: 'Next:', when: 'Tomorrow', time: '6:00 AM' });
+    eq('two days out uses the weekday name (Cast Iron Sat 23:30 To PATH: Sunday has no service)', (({ headline, when, time }) => ({ headline, when, time }))(frameFor(cast, 'to_path', at('2026-10-03', '23:30'))),
+      { headline: 'No more shuttles to PATH today', when: 'Monday', time: '6:00 AM' });
+    // just under / at / just over the threshold (Cast Iron Mon: next to_path is the ≈16:10 estimate; next from_path is 16:00 posted)
+    eq('59 min away (To PATH): normal hero', frameFor(cast, 'to_path', at('2026-10-05', '15:11')), { gap: null });
+    eq('exactly 60 min away: still the normal hero', frameFor(cast, 'to_path', at('2026-10-05', '15:10')), { gap: null });
+    eq('61 min away: gap hero', frameFor(cast, 'to_path', at('2026-10-05', '15:09')).gap, 'same-day');
+    eq('Home 59 min wait: normal; 60: normal; 61: "No shuttle home until 4:00 PM"',
+      [frameFor(cast, 'from_path', at('2026-10-05', '15:01')), frameFor(cast, 'from_path', at('2026-10-05', '15:00')), frameFor(cast, 'from_path', at('2026-10-05', '14:59'))],
+      [{ gap: null }, { gap: null }, { gap: 'same-day', headline: 'No shuttle home until', time: '4:00 PM' }]);
+    ok('Home: wait is measured from the picked train, not from now', (() => {
+      const nd = L.homeShuttle(cast, at('2026-10-05', '14:00'), 15 * 60 + 50); // train arrives 15:50 -> 16:00 shuttle
+      return nd.waitMin === 10 && L.heroFrame({ direction: 'from_path', dep: nd.dep, date: nd.date, now: at('2026-10-05', '14:00'), minutesAway: nd.waitMin }).gap === null;
+    })());
+
+    const fails = results.filter((r) => !r.ok);
+    document.getElementById('summary').textContent = fails.length ? `${fails.length} of ${results.length} FAILED` : `All ${results.length} passed`;
+    document.getElementById('results').innerHTML = results.map((r) =>
+      `<li class="${r.ok ? 'pass' : 'fail'}">${r.name}${r.ok ? '' : ` — got ${JSON.stringify(r.got)}, want ${JSON.stringify(r.want)}`}</li>`).join('');
+    window.__testResults = { total: results.length, failed: fails.map((f) => f.name) };
+  </script>
+</body>
+</html>

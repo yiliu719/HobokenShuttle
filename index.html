@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Hoboken Shuttle</title>
+  <meta name="description" content="Next shuttle to Hoboken PATH, and which train you can make.">
+  <meta name="theme-color" content="#0F1B2D">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="app-header">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="3" width="16" height="15" rx="3"/><path d="M4 11h16M8 18v2.5M16 18v2.5"/><circle cx="8" cy="14.5" r=".6" fill="currentColor"/><circle cx="16" cy="14.5" r=".6" fill="currentColor"/>
+        </svg>
+        <span>Hoboken Shuttle</span>
+      </div>
+      <div class="clock mono" id="clock" aria-live="off"></div>
+    </header>
+
+    <main>
+      <section id="screen-main" aria-label="Next shuttle">
+        <div class="field">
+          <label for="building">My building</label>
+          <select id="building"></select>
+        </div>
+        <div class="seg" role="group" aria-label="Direction">
+          <button type="button" class="seg-btn" data-mode="to" aria-pressed="false">To PATH</button>
+          <button type="button" class="seg-btn" data-mode="home" aria-pressed="false">Home from PATH</button>
+        </div>
+        <div class="field" id="picker" hidden>
+          <label for="arrival">My train arrives at Hoboken</label>
+          <select id="arrival"></select>
+        </div>
+        <div id="content"></div>
+      </section>
+
+      <section id="screen-schedule" aria-label="Full schedule" hidden>
+        <div class="sched-bar">
+          <button type="button" class="back" id="back"><span aria-hidden="true">←</span> Back</button>
+          <div class="field field--bar">
+            <label for="building2" class="sr-only">My building</label>
+            <select id="building2"></select>
+          </div>
+        </div>
+        <div id="schedule"></div>
+      </section>
+    </main>
+    <noscript><p class="note">This app needs JavaScript to show the schedule.</p></noscript>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
