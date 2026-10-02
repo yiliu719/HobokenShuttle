@@ -32,8 +32,8 @@ def validate(data):
     for b in data.get("buildings", []):
         bid = b.get("id", "?")
         vehicles = b.get("vehicles")
-        if not isinstance(vehicles, dict) or not vehicles:
-            errors.append("%s: missing or empty 'vehicles'" % bid)
+        if not isinstance(vehicles, dict):  # may be empty: buildings that post no vehicle names use {} and null vehicles
+            errors.append("%s: missing 'vehicles' map" % bid)
             vehicles = {}
         if not isinstance(b.get("rideMinutes"), int):
             errors.append("%s: missing or non-integer 'rideMinutes'" % bid)

@@ -265,6 +265,116 @@
           "text": "Sunday: on-call service 10am–6pm, one-way, local trips within a 5-minute radius. Call the concierge for shuttle location."
         }
       ]
+    },
+    {
+      "id": "hudson-house",
+      "name": "Hudson House",
+      "source": "Posted shuttle schedule (shared by Hudson House, East, West, Radio Lofts)",
+      "rideMinutes": 10,
+      "loopMinutes": 10,
+      "vehicles": {},
+      "services": [
+        {
+          "direction": "to_path",
+          "from": "Hudson House",
+          "days": ["mon", "tue", "wed", "thu", "fri"],
+          "departures": [
+            {"time": "06:00", "vehicle": null},
+            {"time": "06:15", "vehicle": null},
+            {"time": "06:30", "vehicle": null},
+            {"time": "06:45", "vehicle": null},
+            {"time": "07:00", "vehicle": null},
+            {"time": "07:15", "vehicle": null},
+            {"time": "07:30", "vehicle": null},
+            {"time": "07:45", "vehicle": null},
+            {"time": "08:00", "vehicle": null},
+            {"time": "08:15", "vehicle": null},
+            {"time": "08:30", "vehicle": null},
+            {"time": "08:45", "vehicle": null},
+            {"time": "09:00", "vehicle": null},
+            {"time": "09:15", "vehicle": null},
+            {"time": "09:30", "vehicle": null},
+            {"time": "09:45", "vehicle": null}
+          ]
+        },
+        {
+          "direction": "from_path",
+          "from": "Hoboken PATH (pickup near 70 Hudson St)",
+          "days": ["mon", "tue", "wed", "thu", "fri"],
+          "departures": [
+            {"time": "16:30", "vehicle": null},
+            {"time": "17:00", "vehicle": null},
+            {"time": "17:15", "vehicle": null},
+            {"time": "17:30", "vehicle": null},
+            {"time": "17:45", "vehicle": null},
+            {"time": "18:00", "vehicle": null},
+            {"time": "18:15", "vehicle": null},
+            {"time": "18:30", "vehicle": null},
+            {"time": "18:45", "vehicle": null},
+            {"time": "19:00", "vehicle": null},
+            {"time": "19:15", "vehicle": null},
+            {"time": "19:30", "vehicle": null},
+            {"time": "19:45", "vehicle": null},
+            {"time": "20:00", "vehicle": null},
+            {"time": "20:15", "vehicle": null},
+            {"time": "20:30", "vehicle": null}
+          ]
+        },
+        {
+          "direction": "from_path",
+          "from": "Hoboken PATH (pickup near 70 Hudson St)",
+          "days": ["thu", "fri"],
+          "departures": [
+            {"time": "21:00", "vehicle": null},
+            {"time": "21:30", "vehicle": null},
+            {"time": "22:00", "vehicle": null},
+            {"time": "22:30", "vehicle": null}
+          ]
+        },
+        {
+          "direction": "to_path",
+          "from": "Hudson House",
+          "days": ["sat"],
+          "departures": [
+            {"time": "15:00", "vehicle": null},
+            {"time": "15:30", "vehicle": null},
+            {"time": "16:00", "vehicle": null},
+            {"time": "16:30", "vehicle": null},
+            {"time": "17:00", "vehicle": null},
+            {"time": "17:30", "vehicle": null},
+            {"time": "18:00", "vehicle": null},
+            {"time": "19:00", "vehicle": null},
+            {"time": "19:30", "vehicle": null},
+            {"time": "20:00", "vehicle": null},
+            {"time": "20:30", "vehicle": null},
+            {"time": "21:00", "vehicle": null},
+            {"time": "21:30", "vehicle": null},
+            {"time": "22:00", "vehicle": null}
+          ]
+        },
+        {
+          "direction": "to_path",
+          "from": "Hudson House",
+          "days": ["sun"],
+          "departures": [
+            {"time": "11:00", "vehicle": null},
+            {"time": "11:30", "vehicle": null},
+            {"time": "12:00", "vehicle": null},
+            {"time": "12:30", "vehicle": null},
+            {"time": "13:00", "vehicle": null},
+            {"time": "13:30", "vehicle": null},
+            {"time": "14:00", "vehicle": null},
+            {"time": "15:00", "vehicle": null},
+            {"time": "15:30", "vehicle": null},
+            {"time": "16:00", "vehicle": null},
+            {"time": "16:30", "vehicle": null},
+            {"time": "17:00", "vehicle": null},
+            {"time": "17:30", "vehicle": null},
+            {"time": "18:00", "vehicle": null}
+          ]
+        }
+      ],
+      "notices": []
     }
   ],
   "disclaimer": "All departures are estimated. Weather, road closures, accidents and traffic may affect the schedule."

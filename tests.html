@@ -198,6 +198,42 @@
       return nd.waitMin === 10 && L.heroFrame({ direction: 'from_path', dep: nd.dep, date: nd.date, now: at('2026-10-05', '14:00'), minutesAway: nd.waitMin }).gap === null;
     })());
 
+    // ---- Hudson House: empty vehicles map, null vehicles everywhere, real Sat/Sun service (posted to_path only) ----
+    const hud = bld('hudson-house');
+    const allHud = ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05'].flatMap((d) => ['to_path', 'from_path'].flatMap((dir) => L.departuresFor(hud, dir, d)));
+    ok('empty vehicles map: every departure (posted and estimated) has a null vehicle, so no chip anywhere', allHud.length > 100 && allHud.every((d) => d.vehicle === null), allHud.length);
+    eq('empty vehicles map: unknown id resolves to null, not a crash', [L.vehicleOf(hud, 'bus1'), L.vehicleOf(hud, null)], [null, null]);
+
+    n = L.nextDeparture(hud, 'to_path', at('2026-10-05', '07:41'));
+    eq('Hudson Mon 07:41 To PATH: next 07:45 posted, arrives ≈ 7:55 AM', [n.dep.time, n.dep.estimated, fmtText(n.dep.min + hud.rideMinutes)], ['07:45', false, '7:55 AM']);
+
+    h = L.homeShuttle(hud, at('2026-10-05', '16:10'), null);
+    eq('Hudson Mon 16:10 Home: next 16:30 posted (20 min wait, normal hero)', [h.dep.time, h.dep.estimated, h.waitMin, frameFor(hud, 'from_path', at('2026-10-05', '16:10')).gap], ['16:30', false, 20, null]);
+
+    last = L.lastShuttle(hud, 'to_path', '2026-10-05', true);
+    eq('Hudson Mon last to PATH ≈ 20:25 (20:15 + 10); the 20:30 last run does not return', [last.time, last.estimated, estOnly(hud, 'to_path', '2026-10-05').some((d) => d.time === '20:40')], ['20:25', true, false]);
+    eq('Hudson Mon 20:35 To PATH: next-day hero -> "No more shuttles to PATH today", Next: Tomorrow 6:00 AM',
+      frameFor(hud, 'to_path', at('2026-10-05', '20:35')), { gap: 'later-day', headline: 'No more shuttles to PATH today', next: 'Next:', when: 'Tomorrow', time: '6:00 AM' });
+
+    h = L.homeShuttle(hud, at('2026-10-09', '22:00'), null);
+    eq('Hudson Fri 22:00 Home: 22:00 posted, leaving now', [h.dep.time, h.dep.estimated, h.waitMin], ['22:00', false, 0]);
+    eq('Hudson Fri: 22:00 returns ≈22:10, the 22:30 last run has no return', [estOnly(hud, 'to_path', '2026-10-09').some((d) => d.time === '22:10'), estOnly(hud, 'to_path', '2026-10-09').some((d) => d.time === '22:40'), L.lastShuttle(hud, 'from_path', '2026-10-09').time], [true, false, '22:30']);
+
+    eq('Hudson Sat 13:59 To PATH: 61 min away -> "No shuttle to PATH until 3:00 PM" (posted, no ≈)', frameFor(hud, 'to_path', at('2026-10-03', '13:59')), { gap: 'same-day', headline: 'No shuttle to PATH until', time: '3:00 PM' });
+    eq('Hudson Sat 14:00 To PATH: exactly 60 min away is NOT more than the threshold -> normal hero', frameFor(hud, 'to_path', at('2026-10-03', '14:00')), { gap: null });
+
+    h = L.homeShuttle(hud, at('2026-10-04', '12:10'), null);
+    eq('Hudson Sun 12:10 Home: next ≈12:10 (estimated return of the 12:00 run)', [h.dep.time, h.dep.estimated, h.waitMin, h.dep.returningFrom], ['12:10', true, 0, 'Hudson House']);
+    eq('Sunday service works with the estimation rules: 14 posted to_path, 14 estimated from_path (the last Sunday run also returns)',
+      [L.departuresFor(hud, 'to_path', '2026-10-04').filter((d) => !d.estimated).length, estOnly(hud, 'from_path', '2026-10-04').length, estOnly(hud, 'from_path', '2026-10-04').at(-1).time], [14, 14, '18:10']);
+    eq('Saturday: 14 posted to_path, estimated returns 15:10 .. 22:10, none to PATH', [estOnly(hud, 'from_path', '2026-10-03').length, estOnly(hud, 'from_path', '2026-10-03')[0].time, estOnly(hud, 'from_path', '2026-10-03').at(-1).time, estOnly(hud, 'to_path', '2026-10-03').length], [14, '15:10', '22:10', 0]);
+    eq('estimated trips use the building\'s own stop names',
+      [estOnly(hud, 'from_path', '2026-10-04')[0].from, estOnly(hud, 'to_path', '2026-10-05')[0].from, estOnly(cast, 'from_path', '2026-10-05')[0].from, estOnly(cast, 'to_path', '2026-10-05')[0].from],
+      ['Hoboken PATH (pickup near 70 Hudson St)', 'Hudson House', 'Hoboken PATH Station', 'Cast Iron Lofts']);
+    eq('Hudson tabs', L.scheduleGroups(hud).map((g) => g.label), ['Mon–Wed', 'Thu–Fri', 'Sat', 'Sun']);
+    ok('Hudson Sat/Sun tabs: 14 posted to_path rows and 14 estimated from_path rows each', (() => { const g = L.scheduleGroups(hud); return g[3].to.length === 14 && g[3].from.length === 14 && g[3].from.every((d) => d.estimated) && g[2].to.length === 14 && g[2].from.length === 14; })());
+    ok('Hudson House has no notices on any day', ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05'].every((d) => L.noticesFor(hud, d).length === 0) && hud.notices.length === 0);
+
     const fails = results.filter((r) => !r.ok);
     document.getElementById('summary').textContent = fails.length ? `${fails.length} of ${results.length} FAILED` : `All ${results.length} passed`;
     document.getElementById('results').innerHTML = results.map((r) =>

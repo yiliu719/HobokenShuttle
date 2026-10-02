@@ -20,6 +20,12 @@ export const PATH_NAME = 'Hoboken PATH Station';
 const OPPOSITE = { to_path: 'from_path', from_path: 'to_path' };
 const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
+/** Where trips in `direction` start: the building's own posted stop name for that direction, else a sensible default. */
+function endName(building, direction) {
+  const svc = building.services.find((s) => s.direction === direction);
+  return svc ? svc.from : direction === 'to_path' ? building.name : PATH_NAME;
+}
+
 /** Posted departures for a weekday key in one direction: services whose `days` include it, merged and sorted. */
 function postedForKey(building, direction, key) {
   const seen = new Set(), out = [];
@@ -53,7 +59,7 @@ export function departuresForKey(building, direction, key) {
     if (s.min === lastEvening || min >= 1440 || taken.has(min)) continue;
     estimates.push({
       time: hhmm(min), min, vehicle: s.vehicle, estimated: true,
-      from: direction === 'to_path' ? building.name : PATH_NAME,
+      from: endName(building, direction),
       returningFrom: direction === 'to_path' ? 'PATH' : building.name, // where the posted run it derives from started
     });
   }
