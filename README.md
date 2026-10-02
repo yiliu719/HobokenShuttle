@@ -2,7 +2,7 @@
 
 **Live: [hoboken-shuttle.pages.dev](https://hoboken-shuttle.pages.dev)**
 
-When's the next shuttle to PATH, and which train will I make? A simple mobile site for residents of Cast Iron Lofts and Soho Lofts in Hoboken, NJ.
+When's the next shuttle to PATH, and which train will I make? A simple mobile site for residents of Cast Iron Lofts and Soho Lofts in Jersey City, NJ.
 
 ## Features
 
