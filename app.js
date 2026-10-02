@@ -5,6 +5,7 @@ import {
 } from './js/logic.js';
 
 const TRIP_PLANNER = 'https://www.panynj.gov/path/en/trip-planner.html';
+const FEEDBACK_URL = 'https://forms.gle/fx5A88hsjfQsoiRn9'; // the feedback form: change it here, once
 const EVENING_FROM_MIN = 14 * 60; // from here on, To PATH shows the last-shuttle banner
 const MODE_TTL_MS = 3 * 3600e3; // a manual To/Home pick expires so tomorrow morning starts fresh
 const $ = (s) => document.querySelector(s);
@@ -54,7 +55,8 @@ function noticesHtml(b, now) {
   return noticesFor(b, now.date).map((n) => `<div class="card notice"><p>${esc(n.text)}</p></div>`).join('');
 }
 const APPROX_NOTE = '<p class="foot">≈ times are estimated from each shuttle’s loop, not posted.</p>';
-const footHtml = (b) => `<p class="foot">Times are estimates; ride to PATH assumed ~${b.rideMinutes} min.</p>${APPROX_NOTE}`;
+const FEEDBACK_LINK = `<p class="foot foot--link"><a href="${esc(FEEDBACK_URL)}" target="_blank" rel="noopener">Feedback / report a wrong time</a></p>`;
+const footHtml = (b) => `<p class="foot">Times are estimates; ride to PATH assumed ~${b.rideMinutes} min.</p>${APPROX_NOTE}${FEEDBACK_LINK}`;
 const scheduleLink = '<a class="link-row" href="#/schedule">See full schedule</a>';
 
 // ---- Screen 1: To PATH ----
@@ -162,7 +164,7 @@ function scheduleScreen(now, b) {
       return `<li class="row ${cls}${d.estimated ? ' est' : ''}"><div class="row-main">${timeHtml(d.min, '', d.estimated)}${chip(d.vehicle)}</div>${cls === 'next' ? `<span class="badge">NEXT · ${d.min - now.minutes <= 0 ? 'now' : hm(d.min - now.minutes)}</span>` : ''}</li>`;
     }).join('') + '</ul>');
   }
-  out.push(`<p class="foot">${esc(state.schedules.disclaimer || '')}</p>${APPROX_NOTE}`);
+  out.push(`<p class="foot">${esc(state.schedules.disclaimer || '')}</p>${APPROX_NOTE}${FEEDBACK_LINK}`);
   return out.join('');
 }
 

@@ -111,3 +111,5 @@ Fetches PATH's weekday and weekend schedule data from panynj.gov (two requests, 
 ## Disclaimer
 
 An independent resident project, not affiliated with PATH, the Port Authority of NY & NJ, or building management. All times are estimates; traffic and weather affect shuttle service. Check posted schedules when in doubt.
+
+Found a wrong time or want your building added? Use the Feedback link in the app.
