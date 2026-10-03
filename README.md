@@ -14,7 +14,7 @@ Times marked **≈** are estimated from each shuttle's loop, since the posted sc
 
 ## Feedback
 
-Found a wrong time, or want your building added? Use the **Feedback** link at the bottom of the site.
+Found a wrong time, or want your building added? Use the "Add your building / Report a wrong time" link at the bottom of the site.
 
 ## For developers
 

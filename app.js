@@ -55,7 +55,7 @@ function noticesHtml(b, now) {
   return noticesFor(b, now.date).map((n) => `<div class="card notice"><p>${esc(n.text)}</p></div>`).join('');
 }
 const APPROX_NOTE = '<p class="foot">≈ times are estimated from each shuttle’s loop, not posted.</p>';
-const FEEDBACK_LINK = `<p class="foot foot--link"><a href="${esc(FEEDBACK_URL)}" target="_blank" rel="noopener">Feedback / report a wrong time</a></p>`;
+const FEEDBACK_LINK = `<p class="foot foot--link"><a href="${esc(FEEDBACK_URL)}" target="_blank" rel="noopener">Add your building / Report a wrong time</a></p>`;
 const footHtml = (b) => `<p class="foot">Times are estimates; ride to PATH assumed ~${b.rideMinutes} min.</p>${APPROX_NOTE}${FEEDBACK_LINK}`;
 const scheduleLink = '<a class="link-row" href="#/schedule">See full schedule</a>';
 
